@@ -107,5 +107,5 @@ if soru := st.chat_input("Enes.AI'a bir şey sor..."):
             cevap = guvenli_mesaj_gonder(st.session_state.sohbet, soru)
             st.markdown(cevap.text)
             st.session_state.mesajlar.append({"rol": "assistant", "icerik": cevap.text})
-        except Exception as {e}:
+        except Exception as e:
             st.error(f"Hata detayı: {e}")
