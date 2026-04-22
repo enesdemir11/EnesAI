@@ -87,33 +87,39 @@ for mesaj in st.session_state.mesajlar:
 
 # 6. Kullanıcıdan Yeni Mesaj Alma Kutusu
 if soru := st.chat_input("Enes.AI'a bir şey sor..."):
-    # Mesajı ekrana bas ve hafızaya TEK SEFER ekle
+    # 1. Kullanıcı mesajını ekrana bas ve hafızaya ekle (Sadece 1 kez!)
     with st.chat_message("user"):
         st.markdown(soru)
     st.session_state.mesajlar.append({"rol": "user", "icerik": soru})
 
     with st.chat_message("assistant"):
         try:
-            # Gemini'ye göndermeden önce rolleri çeviriyoruz (Tercümanlık)
+            # 2. Gemini'nin beklediği o hassas formatı hazırlıyoruz (Sözlük yapısı)
             gemini_gecmisi = []
-            for m in st.session_state.mesajlar[:-1]: 
+            for m in st.session_state.mesajlar[:-1]: # Son soru hariç geçmişi paketle
                 rol = "model" if m["rol"] == "assistant" else "user"
-                gemini_gecmisi.append({"role": rol, "parts": [m["icerik"]]})
+                # Hatanın çözümü burası: İçeriği {"text": ...} sözlüğü içine alıyoruz
+                gemini_gecmisi.append({"role": rol, "parts": [{"text": m["icerik"]}]})
             
-            # BURASI KRİTİK: 'model' yerine 'client' kullanarak yeni bir chat başlatıyoruz
+            # 3. Yeni bir chat oturumu başlat
             sohbet_yenilenmis = client.chats.create(
-                model="gemini-2.0-flash", # Kullandığın model ismini buraya yaz
+                model="gemini-1.5-flash", # Limit hatası almamak için 1.5 deniyoruz
                 config=types.GenerateContentConfig(system_instruction=benim_karakterim),
                 history=gemini_gecmisi
             )
             
+            # 4. Cevabı al ve ekrana bas
             cevap = sohbet_yenilenmis.send_message(soru)
             
             st.markdown(cevap.text)
             st.session_state.mesajlar.append({"rol": "assistant", "icerik": cevap.text})
             
         except Exception as e:
-            st.error(f"Hata detayı: {e}")
+            if "429" in str(e):
+                st.warning("🤖 Limit doldu, 1 dakika bekleyip tekrar dene!")
+            else:
+                st.error(f"Hata detayı: {e}")
+            
             if st.button("Sohbeti Sıfırla"):
                 st.session_state.mesajlar = []
                 st.rerun()
