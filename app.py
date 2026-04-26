@@ -159,7 +159,7 @@ for mesaj in st.session_state.mesajlar:
 # 6. Kullanıcıdan Yeni Mesaj Alma Kutusu
 if soru := st.chat_input("Erper'a bir şey sor..."):
     # 1. Kullanıcı mesajını ekrana bas ve listeye TEK SEFER ekle
-    with st.chat_message("user", avatar="👤"):
+    with st.chat_message("user", avatar="🧑‍🔧"):
         st.markdown(soru)
     st.session_state.mesajlar.append({"rol": "user", "icerik": soru})
 
