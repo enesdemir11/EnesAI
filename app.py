@@ -150,17 +150,20 @@ if "mesajlar" not in st.session_state:
 
 # 5. Eski Mesajları Ekrana Çiz
 for mesaj in st.session_state.mesajlar:
-    with st.chat_message(mesaj["rol"]):
+    # Kullanıcı için mühendis emojisi, AI için senin FT logon
+    ikon = "🧑‍🔧" if mesaj["rol"] == "user" else logo_image
+    
+    with st.chat_message(mesaj["rol"], avatar=ikon):
         st.markdown(mesaj["icerik"])
 
 # 6. Kullanıcıdan Yeni Mesaj Alma Kutusu
 if soru := st.chat_input("Erper'a bir şey sor..."):
     # 1. Kullanıcı mesajını ekrana bas ve listeye TEK SEFER ekle
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar="👤"):
         st.markdown(soru)
     st.session_state.mesajlar.append({"rol": "user", "icerik": soru})
 
-    with st.chat_message("assistant"):
+    with st.chat_message("assistant", avatar=logo_image):
         try:
             # 2. Gemini'nin titiz olduğu veri formatını hazırlıyoruz (parts içindeki text yapısı)
             gemini_gecmisi = []
