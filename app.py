@@ -179,33 +179,47 @@ if soru := st.chat_input("Erper'a bir şey sor..."):
     st.session_state.mesajlar.append({"rol": "user", "icerik": soru})
 
     with st.chat_message("assistant", avatar=logo_image):
-        try:
-            # 2. Gemini'nin titiz olduğu veri formatını hazırlıyoruz (parts içindeki text yapısı)
-            gemini_gecmisi = []
-            for m in st.session_state.mesajlar[:-1]: # Son soru hariç geçmişi paketle
-                rol = "model" if m["rol"] == "assistant" else "user"
-                gemini_gecmisi.append({"role": rol, "parts": [{"text": m["icerik"]}]})
-            
-            # 3. Belirlediğin 2.5 modeli ile bağlantıyı kuruyoruz
-            sohbet_yenilenmis = client.chats.create(
-                model="gemini-2.5-flash", 
-                config=types.GenerateContentConfig(system_instruction=benim_karakterim),
-                history=gemini_gecmisi
-            )
-            
-            # 4. Yanıtı al, ekrana bas ve hafızaya kaydet
-            cevap = sohbet_yenilenmis.send_message(soru)
-            
+       # 2. Gemini'nin titiz olduğu veri formatını hazırlıyoruz (parts içindeki text yapısı)
+        gemini_gecmisi = []
+        for m in st.session_state.mesajlar[:-1]: # Son soru hariç geçmişi paketle
+            rol = "model" if m["rol"] == "assistant" else "user"
+            gemini_gecmisi.append({"role": rol, "parts": [{"text": m["icerik"]}]})
+        
+        # 3. Belirlediğin 2.5 modeli ile bağlantıyı kuruyoruz
+        sohbet_yenilenmis = client.chats.create(
+            model="gemini-2.5-flash", 
+            config=types.GenerateContentConfig(system_instruction=benim_karakterim),
+            history=gemini_gecmisi
+        )
+        
+        # 4. Yanıtı al, ekrana bas ve hafızaya kaydet (YENİ TEKRAR DENEME SİSTEMİ)
+        max_deneme = 3
+        basari = False
+        
+        for deneme in range(max_deneme):
+            try:
+                cevap = sohbet_yenilenmis.send_message(soru)
+                basari = True
+                break # Başarılı olursa döngüden çık
+            except Exception as e:
+                hata_metni = str(e)
+                # 503 (Sunucu Yoğunluğu) veya 429 (Limit Aşımı) durumunda tekrar dene
+                if "503" in hata_metni or "429" in hata_metni or "500" in hata_metni:
+                    if deneme < max_deneme - 1:
+                        st.toast(f"Sunucu yoğun, tekrar deneniyor... ({deneme+1}/{max_deneme})")
+                        time.sleep(2) 
+                    else:
+                        st.warning("🌐 Sunucular şu an aşırı yoğun. Lütfen 1 dakika sonra tekrar deneyin.")
+                else:
+                    st.error(f"Hata detayı: {hata_metni}")
+                    break # Başka bir hata varsa döngüyü kır
+                    
+        # Eğer denemeler başarılı olduysa mesajı ekrana bas
+        if basari:
             st.markdown(cevap.text)
             st.session_state.mesajlar.append({"rol": "assistant", "icerik": cevap.text})
-            
-        except Exception as e:
-            # Limit (429) veya diğer hatalar için kullanıcı dostu uyarı
-            if "429" in str(e):
-                st.warning("🤖 Limit doldu! Gemini 2.5 şu an çok talep görüyor, lütfen bir dakika bekleyip dene.")
-            else:
-                st.error(f"Hata detayı: {e}")
-            
+        else:
+            # Hata durumunda (başarısız olduğunda) sıfırlama butonunu göster
             if st.button("Sohbeti Sıfırla"):
                 st.session_state.mesajlar = []
                 st.rerun()
