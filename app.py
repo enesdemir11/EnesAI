@@ -23,17 +23,27 @@ st.set_page_config(
 # --- 2. KURUMSAL TASARIM (CSS) ---
 st.markdown("""
     <style>
-    /* Genel arka plan: Profesyonel Koyu Grafit/Siyah */
-    .stApp {
+    /* 1. Genel Ana Ekran ve En Alt Çerçeveyi Koyu Temaya Zorla */
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stBottomBlock"], [data-testid="stBottomBlock"] > div {
         background-color: #121212 !important;
     }
     
-    /* Ekrandaki TÜM metinleri açık renge zorla (Light Mode çakışmasını engeller) */
-    .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp span, [data-testid="stMarkdownContainer"] * {
+    /* 2. Yan Menü (Sidebar) Arka Planı (Ana ekrandan çok hafif farklı bir siyah) */
+    [data-testid="stSidebar"] {
+        background-color: #18181B !important; 
+    }
+    
+    /* 3. Üst Boşluk (Header) Arka Planını Şeffaf Yap */
+    [data-testid="stHeader"] {
+        background-color: rgba(0,0,0,0) !important; 
+    }
+    
+    /* 4. Ekrandaki TÜM metinleri açık renge zorla (Light Mode çakışmasını engeller) */
+    .stApp *, [data-testid="stSidebar"] * {
         color: #E0E0E0 !important;
     }
     
-    /* Kullanıcı Mesajı Kutusu */
+    /* 5. Kullanıcı Mesajı Kutusu */
     [data-testid="stChatMessage"]:nth-child(odd) {
         background-color: #1E293B !important; 
         border: 1px solid #334155 !important;
@@ -41,23 +51,18 @@ st.markdown("""
         margin-bottom: 15px !important;
     }
 
-    /* AI Mesajı Kutusu */
+    /* 6. AI Mesajı Kutusu (ED Logosu Turuncu Vurgulu) */
     [data-testid="stChatMessage"]:nth-child(even) {
         background-color: #18181B !important; 
-        border-left: 3px solid #38BDF8 !important; 
+        border-left: 3px solid #E67E22 !important; /* ED Logosundaki Turuncu renk eklendi */
         border-radius: 6px !important;
         margin-bottom: 15px !important;
     }
     
-    /* En alttaki mesaj yazma kutusunu (Chat Input) da koyu temaya uydur */
+    /* 7. Mesaj Yazma Kutusu (Chat Input) */
     [data-testid="stChatInput"] {
         background-color: #1E293B !important;
         border: 1px solid #334155 !important;
-    }
-    
-    /* Mesaj yazma kutusunun içindeki metinler */
-    [data-testid="stChatInput"] * {
-        color: #E0E0E0 !important;
     }
     </style>
     """, unsafe_allow_html=True)
