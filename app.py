@@ -117,19 +117,19 @@ with st.sidebar:
     
     st.markdown("---")
         
-        # YENİ EKLENEN DOSYA YÜKLEME KISMI
-        st.subheader("📎 Analiz İçin Medya Yükle")
-        yuklenen_dosya = st.file_uploader(
-            "Desteklenenler: PDF, Word, Excel, Görsel, Video", 
-            type=["png", "jpg", "jpeg", "pdf", "txt", "csv", "xlsx", "docx", "mp4", "mov", "avi"]
-        )
+    # YENİ EKLENEN DOSYA YÜKLEME KISMI
+    st.subheader("📎 Analiz İçin Medya Yükle")
+    yuklenen_dosya = st.file_uploader(
+        "Desteklenenler: PDF, Word, Excel, Görsel, Video", 
+        type=["png", "jpg", "jpeg", "pdf", "txt", "csv", "xlsx", "docx", "mp4", "mov", "avi"]
+    )
         
-        st.markdown("---")
+    st.markdown("---")
         
-        # MEVCUT SIFIRLAMA BUTONU
-        if st.button("🔄 Oturumu Sıfırla", use_container_width=True):
-            st.session_state.messages = []
-            st.rerun()
+    # MEVCUT SIFIRLAMA BUTONU
+    if st.button("🔄 Oturumu Sıfırla", use_container_width=True):
+        st.session_state.messages = []
+        st.rerun()
 
 # --- 4. ANA EKRAN BAŞLIĞI ---
 st.title("ERPnDIP AI")
