@@ -1,4 +1,7 @@
 streamlit
 google-genai
 Pillow
-
+pandas
+openpyxl
+PyPDF2
+python-docx

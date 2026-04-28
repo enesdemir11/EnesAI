@@ -4,6 +4,62 @@ from google import genai
 from google.genai import types
 from PIL import Image
 import os
+import pandas as pd
+import PyPDF2
+import docx
+import tempfile
+
+# --- 1. DOSYA VE VİDEO OKUMA FONKSİYONU ---
+def dosya_oku(file):
+    # Görsel ise
+    if file.name.endswith(('.png', '.jpg', '.jpeg')):
+        return Image.open(file), "image"
+    
+    # Metin ise
+    elif file.name.endswith('.txt'):
+        return file.getvalue().decode("utf-8"), "text"
+    
+    # PDF ise
+    elif file.name.endswith('.pdf'):
+        reader = PyPDF2.PdfReader(file)
+        return "\n".join([page.extract_text() for page in reader.pages if page.extract_text()]), "text"
+    
+    # Excel/CSV ise
+    elif file.name.endswith('.csv'):
+        return pd.read_csv(file).to_string(), "text"
+    elif file.name.endswith('.xlsx'):
+        return pd.read_excel(file).to_string(), "text"
+    
+    # Word ise
+    elif file.name.endswith('.docx'):
+        doc = docx.Document(file)
+        return "\n".join([para.text for para in doc.paragraphs]), "text"
+        
+    # Video ise (Arka planda Google sunucularına geçici yükleme yapar)
+    elif file.name.endswith(('.mp4', '.mov', '.avi')):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file.name.split('.')[-1]}") as temp_video:
+            temp_video.write(file.read())
+            temp_path = temp_video.name
+
+        st.toast("Video işleniyor, bu işlem dosya boyutuna göre sürebilir...", icon="⏳")
+        
+        # Gemini'ye yükleme
+        video_file = client.files.upload(file=temp_path)
+
+        # Video hazır olana kadar bekle
+        while video_file.state.name == 'PROCESSING':
+            time.sleep(2)
+            video_file = client.files.get(name=video_file.name)
+
+        if video_file.state.name == 'FAILED':
+            st.error("Video işlenirken bir hata oluştu.")
+            os.remove(temp_path)
+            return None, None
+
+        os.remove(temp_path)
+        return video_file, "video"
+        
+    return None, None
 
 # --- LOGO YÜKLEME ---
 # Uzantı .png olarak güncellendi
@@ -60,9 +116,20 @@ with st.sidebar:
     st.info("Altyapı: gemini-2.5-flash") 
     
     st.markdown("---")
-    if st.button("🔄 Oturumu Sıfırla", use_container_width=True):
-        st.session_state.messages = []
-        st.rerun()
+        
+        # YENİ EKLENEN DOSYA YÜKLEME KISMI
+        st.subheader("📎 Analiz İçin Medya Yükle")
+        yuklenen_dosya = st.file_uploader(
+            "Desteklenenler: PDF, Word, Excel, Görsel, Video", 
+            type=["png", "jpg", "jpeg", "pdf", "txt", "csv", "xlsx", "docx", "mp4", "mov", "avi"]
+        )
+        
+        st.markdown("---")
+        
+        # MEVCUT SIFIRLAMA BUTONU
+        if st.button("🔄 Oturumu Sıfırla", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
 
 # --- 4. ANA EKRAN BAŞLIĞI ---
 st.title("ERPnDIP AI")
@@ -155,55 +222,79 @@ for mesaj in st.session_state.mesajlar:
     with st.chat_message(mesaj["rol"], avatar=ikon):
         st.markdown(mesaj["icerik"])
 
-# 6. Kullanıcıdan Yeni Mesaj Alma Kutusu
-if soru := st.chat_input("Erper'a bir şey sor..."):
-    # 1. Kullanıcı mesajını ekrana bas ve listeye TEK SEFER ekle
+# --- 6. ANA SOHBET DÖNGÜSÜ (Dosya Destekli) ---
+if soru := st.chat_input("Erper'a bir şey sorun..."):
+    
+    # 1. Kullanıcı mesajını ekrana bas
     with st.chat_message("user", avatar="🧑‍🔧"):
         st.markdown(soru)
-    st.session_state.mesajlar.append({"rol": "user", "icerik": soru})
+        if yuklenen_dosya:
+            # Dosya varsa altında küçük bir not olarak göster
+            st.caption(f"📎 Eklenen Medya: {yuklenen_dosya.name}")
 
+    # 2. Dosya varsa okuyup soruya entegre et
+    if yuklenen_dosya:
+        dosya_verisi, dosya_tipi = dosya_oku(yuklenen_dosya)
+        
+        if dosya_tipi == "text":
+            # Metin/Excel/PDF okunduysa, yapay zekaya giden sorunun sonuna gizlice ekle
+            gonderilecek_mesaj = f"{soru}\n\n--- EKLENEN DOSYA İÇERİĞİ ---\n{dosya_verisi}"
+            # Ekranda çok yer kaplamasın diye hafızaya sadece özetini kaydet
+            hafizaya_kaydedilecek_soru = f"{soru}\n*(Kullanıcı {yuklenen_dosya.name} belgesini yükledi)*"
+            
+        elif dosya_tipi == "image" or dosya_tipi == "video":
+            # Görsel veya video ise Gemini'nin kabul ettiği liste formatına çevir
+            gonderilecek_mesaj = [soru, dosya_verisi] 
+            hafizaya_kaydedilecek_soru = f"{soru}\n*(Kullanıcı bir {dosya_tipi} yükledi)*"
+    else:
+        # Dosya yoksa sadece soruyu gönder
+        gonderilecek_mesaj = soru
+        hafizaya_kaydedilecek_soru = soru
+
+    # 3. Geçmişe kaydet (Sadece metin olarak)
+    st.session_state.mesajlar.append({"rol": "user", "icerik": hafizaya_kaydedilecek_soru})
+
+    # 4. Gemini'nin istediği geçmiş formatını (history) paketle
+    gemini_gecmisi = []
+    for m in st.session_state.mesajlar[:-1]: 
+        rol = "model" if m["rol"] == "assistant" else "user"
+        gemini_gecmisi.append({"role": rol, "parts": [{"text": m["icerik"]}]})
+
+    sohbet_yenilenmis = client.chats.create(
+        model="gemini-2.5-flash", 
+        config=types.GenerateContentConfig(system_instruction=benim_karakterim),
+        history=gemini_gecmisi
+    )
+
+    # 5. Yanıtı al, ekrana bas ve hafızaya kaydet (Otomatik Tekrar Deneme Sistemi ile)
     with st.chat_message("assistant", avatar=logo_image):
-       # 2. Gemini'nin titiz olduğu veri formatını hazırlıyoruz (parts içindeki text yapısı)
-        gemini_gecmisi = []
-        for m in st.session_state.mesajlar[:-1]: # Son soru hariç geçmişi paketle
-            rol = "model" if m["rol"] == "assistant" else "user"
-            gemini_gecmisi.append({"role": rol, "parts": [{"text": m["icerik"]}]})
-        
-        # 3. Belirlediğin 2.5 modeli ile bağlantıyı kuruyoruz
-        sohbet_yenilenmis = client.chats.create(
-            model="gemini-2.5-flash", 
-            config=types.GenerateContentConfig(system_instruction=benim_karakterim),
-            history=gemini_gecmisi
-        )
-        
-        # 4. Yanıtı al, ekrana bas ve hafızaya kaydet (YENİ TEKRAR DENEME SİSTEMİ)
+        message_placeholder = st.empty()
         max_deneme = 3
         basari = False
+        import time # Emin olmak için buraya da ekledik
         
         for deneme in range(max_deneme):
             try:
-                cevap = sohbet_yenilenmis.send_message(soru)
+                # DİKKAT: Artık 'soru' değil, içine dosya gömdüğümüz 'gonderilecek_mesaj'ı yolluyoruz
+                cevap = sohbet_yenilenmis.send_message(gonderilecek_mesaj)
                 basari = True
-                break # Başarılı olursa döngüden çık
+                break 
             except Exception as e:
                 hata_metni = str(e)
-                # 503 (Sunucu Yoğunluğu) veya 429 (Limit Aşımı) durumunda tekrar dene
                 if "503" in hata_metni or "429" in hata_metni or "500" in hata_metni:
                     if deneme < max_deneme - 1:
-                        st.toast(f"Sunucu yoğun, tekrar deneniyor... ({deneme+1}/{max_deneme})")
+                        st.toast(f"Sunucu yoğun, tekrar deneniyor... ({deneme+1}/{max_deneme})", icon="♻️")
                         time.sleep(2) 
                     else:
                         st.warning("🌐 Sunucular şu an aşırı yoğun. Lütfen 1 dakika sonra tekrar deneyin.")
                 else:
-                    st.error(f"Hata detayı: {hata_metni}")
-                    break # Başka bir hata varsa döngüyü kır
+                    st.error(f"Sistem Hatası: {hata_metni}")
+                    break 
                     
-        # Eğer denemeler başarılı olduysa mesajı ekrana bas
         if basari:
-            st.markdown(cevap.text)
+            message_placeholder.markdown(cevap.text)
             st.session_state.mesajlar.append({"rol": "assistant", "icerik": cevap.text})
         else:
-            # Hata durumunda (başarısız olduğunda) sıfırlama butonunu göster
             if st.button("Sohbeti Sıfırla"):
                 st.session_state.mesajlar = []
                 st.rerun()
