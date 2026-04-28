@@ -266,16 +266,15 @@ if soru := st.chat_input("Erper'a bir şey sorun..."):
         history=gemini_gecmisi
     )
 
-    # 5. Yanıtı al, ekrana bas ve hafızaya kaydet (Otomatik Tekrar Deneme Sistemi ile)
+    # 5. Yanıtı al, ekrana bas ve hafızaya kaydet (GELİŞMİŞ BEKLEME SİSTEMİ)
     with st.chat_message("assistant", avatar=logo_image):
         message_placeholder = st.empty()
-        max_deneme = 3
+        max_deneme = 4 # Deneme sayısını 4'e çıkardık
         basari = False
-        import time # Emin olmak için buraya da ekledik
+        import time 
         
         for deneme in range(max_deneme):
             try:
-                # DİKKAT: Artık 'soru' değil, içine dosya gömdüğümüz 'gonderilecek_mesaj'ı yolluyoruz
                 cevap = sohbet_yenilenmis.send_message(gonderilecek_mesaj)
                 basari = True
                 break 
@@ -283,10 +282,12 @@ if soru := st.chat_input("Erper'a bir şey sorun..."):
                 hata_metni = str(e)
                 if "503" in hata_metni or "429" in hata_metni or "500" in hata_metni:
                     if deneme < max_deneme - 1:
-                        st.toast(f"Sunucu yoğun, tekrar deneniyor... ({deneme+1}/{max_deneme})", icon="♻️")
-                        time.sleep(2) 
+                        # Katlanarak artan bekleme: 1. deneme 3 sn, 2. deneme 6 sn, 3. deneme 12 sn
+                        bekleme_suresi = 3 * (2 ** deneme) 
+                        st.toast(f"Google API yoğun. {bekleme_suresi} sn bekleniyor... ({deneme+1}/{max_deneme})", icon="⏳")
+                        time.sleep(bekleme_suresi) 
                     else:
-                        st.warning("🌐 Sunucular şu an aşırı yoğun. Lütfen 1 dakika sonra tekrar deneyin.")
+                        st.warning("🌐 Google sunucuları şu an isteklere kapalı. Lütfen 1-2 dakika sonra tekrar deneyin.")
                 else:
                     st.error(f"Sistem Hatası: {hata_metni}")
                     break 
